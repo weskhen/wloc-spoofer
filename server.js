@@ -56,7 +56,10 @@ const WLOC_PATH = "/clls/wloc";
 
 // ---- CA Certificate Management ----
 
-const CA_DIR = path.join(__dirname, "ca");
+const BASE_DIR = (__dirname === "/" || !__dirname)
+  ? path.join(process.env.HOME || process.env.USERPROFILE || process.cwd(), ".wloc-spoofer")
+  : __dirname;
+const CA_DIR = path.join(BASE_DIR, "ca");
 const CA_KEY_PATH = path.join(CA_DIR, "ca-key.pem");
 const CA_CERT_PATH = path.join(CA_DIR, "ca-cert.pem");
 
