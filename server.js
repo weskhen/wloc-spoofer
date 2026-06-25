@@ -31,6 +31,8 @@ function findOpenSSL() {
   const candidates = [
     process.env.OPENSSL_BIN,
     "openssl",
+    process.env.PREFIX && path.join(process.env.PREFIX, "bin", "openssl"),
+    "/data/data/com.termux/files/usr/bin/openssl",
     path.join(process.env.ProgramFiles || "C:\\Program Files", "Git", "usr", "bin", "openssl.exe"),
     path.join(process.env.ProgramFiles || "C:\\Program Files", "OpenSSL", "bin", "openssl.exe"),
     path.join(process.env.LOCALAPPDATA || "", "Programs", "Git", "usr", "bin", "openssl.exe"),
@@ -46,9 +48,9 @@ const OPENSSL = findOpenSSL();
 const PORT = parseInt(process.argv[2] || "8080", 10);
 
 const config = {
-  longitude: 120.73,
-  latitude: 28.85,
-  accuracy: 30,
+  longitude: 113.94114,
+  latitude: 22.544577,
+  accuracy: 25,
 };
 
 const WLOC_HOSTS = new Set(["gs-loc-cn.apple.com", "gs-loc.apple.com"]);
@@ -336,7 +338,9 @@ const server = http.createServer((req, res) => {
 
   // Landing page with CA download + setup guide + status detection
   if (reqPath === "/ca" || reqPath === "/" || reqPath === "/index.html") {
-    const host = req.headers.host || `172.27.78.54:${PORT}`;
+    const hostHeader = req.headers.host || "";
+    const host = hostHeader.split(":")[0] || "127.0.0.1";
+    const hostPort = hostHeader.split(":")[1] || PORT;
     const html = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -439,7 +443,7 @@ small{font-size:12px;color:#8e8e93}
 <div class="step-content">
 <div class="step-title">配置 Wi-Fi 代理</div>
 <div class="step-desc">将 HTTP 代理指向本服务器。</div>
-<div class="code">设置 > Wi-Fi > 点击已连接 Wi-Fi 的 (i)<br>滚动到底部 > 配置代理 > 手动<br>服务器: ${host}<br>端口: ${PORT}</div>
+<div class="code">设置 > Wi-Fi > 点击已连接 Wi-Fi 的 (i)<br>滚动到底部 > 配置代理 > 手动<br>服务器: ${host}<br>端口: ${hostPort}</div>
 </div>
 </div>
 
@@ -1146,24 +1150,30 @@ function processServerData(clientTls, buf, hostname, onRemaining) {
 server.listen(PORT, "0.0.0.0", () => {
   const nets = require("os").networkInterfaces();
   let ip = "127.0.0.1";
-  const hotspotPrefixes = ["192.168.43.", "192.168.1.", "192.168.0.", "172.20.", "10.0.0."];
+  const hotspotPrefixes = ["192.168.43.", "192.168.1.", "192.168.0.", "10.0.0."];
   const skipPrefixes = ["127.", "169.254."];
+  const virtualInterfaces = /^(vEthernet|WSL|Loopback|Hyper-V|Bluetooth|Virtual|Teredo|isatap)/i;
   const allIps = [];
   let hotspotIp = null;
+  let firstRealIp = null;
 
   for (const name of Object.keys(nets)) {
     for (const n of nets[name]) {
       if (n.family === "IPv4" && !n.internal && !skipPrefixes.some(p => n.address.startsWith(p))) {
+        if (virtualInterfaces.test(name)) continue;
         allIps.push({ name, address: n.address });
         if (!hotspotIp && hotspotPrefixes.some(p => n.address.startsWith(p))) {
           hotspotIp = n.address;
+        }
+        if (!firstRealIp) {
+          firstRealIp = n.address;
         }
       }
     }
   }
 
   const isMobile = process.platform === "android" || !!process.env.TERMUX_VERSION || !!process.env.PREFIX;
-  const displayIp = hotspotIp || ip;
+  const displayIp = hotspotIp || firstRealIp || ip;
 
   console.log("=========================================");
   console.log("  WLOC Spoofer - Standalone Proxy Server");
